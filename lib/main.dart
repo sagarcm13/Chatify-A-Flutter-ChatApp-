@@ -1,5 +1,4 @@
 import 'package:chatify/pages/home.dart';
-import 'package:chatify/pages/signup.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:chatify/pages/login.dart';
