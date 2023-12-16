@@ -1,6 +1,6 @@
 # chatify
 
-A new Flutter project chat App.
+A new Flutter project Chat App.
 
 ## Getting Started
 
