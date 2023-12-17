@@ -1,50 +1,104 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class Texting extends StatefulWidget {
-  Map<String, String>? oppositeUser;
-  Texting(this.oppositeUser);
+  Map<String, dynamic>? oppositeUser;
+  Texting(this.oppositeUser, {super.key});
   @override
   State<StatefulWidget> createState() => TextPage(oppositeUser);
 }
 
 class TextPage extends State<Texting> {
-  Map<String, String>? oppositeUser;
-  List<Map<String, dynamic>> oppositeText = [
-    {"message": "hi", "time": 1},
-    {"message": "hi2", "time": 3},
-    {"message": "hi3", "time": 4},
-    {"message": "hi4", "time": 6},
-    {"message": "hi5", "time": 8},
-  ];
-  List<Map<String, dynamic>> userText = [
-    {"message": "hi", "time": 2},
-    {"message": "hi2", "time": 5},
-    {"message": "hi3", "time": 7},
-    {"message": "hi4", "time": 9}
-  ];
-  List<Map<String, dynamic>> universal = [
-    {"message": "hi", "time": 1},
-    {"message": "hi", "time": 2},
-    {"message": "hi2", "time": 3},
-    {"message": "hi3", "time": 4},
-    {"message": "hi2", "time": 5},
-    {"message": "hi4", "time": 6},
-    {"message": "hi3", "time": 7},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi5", "time": 8},
-    {"message": "hi4", "time": 9},
-  ];
+  List<Map<String, dynamic>> conversations = [];
+  final Map<String, dynamic>? oppositeUser;
   TextPage(this.oppositeUser);
+  String? useremail;
+  TextEditingController sendmsg = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
+    fetchUser();
+  }
+
+  Future<void> fetchUser() async {
+    FirebaseAuth auth = FirebaseAuth.instance;
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (user == null) {
+        useremail = '';
+        print('User is currently signed out!');
+      } else {
+        useremail = user.email;
+        print(useremail);
+        fetchData();
+      }
+    });
+  }
+
+  Future<void> fetchData() async {
+    var db = FirebaseFirestore.instance;
+    String opposite = oppositeUser?['email']
+        .substring(0, oppositeUser?['email'].indexOf('@'));
+    String? mainUser = useremail?.substring(0, useremail?.indexOf('@'));
+    print('$opposite $mainUser');
+    try {
+      var querySnapshot = await db
+          .collection('Conversations')
+          .where('sender', isEqualTo: mainUser)
+          .where('receiver', isEqualTo: opposite)
+          .get();
+      for (var docSnapshot in querySnapshot.docs) {
+        print('${docSnapshot.id} => ${docSnapshot.data()}');
+        conversations.add(docSnapshot.data());
+      }
+      querySnapshot = await db
+          .collection('Conversations')
+          .where('sender', isEqualTo: opposite)
+          .where('receiver', isEqualTo: mainUser)
+          .get();
+      for (var docSnapshot in querySnapshot.docs) {
+        print('${docSnapshot.id} => ${docSnapshot.data()}');
+        conversations.add(docSnapshot.data());
+      }
+      print(DateTime.now());
+      conversations.sort((a, b) => a['time'].compareTo(b['time']));
+      print(conversations);
+      setState(() {});
+    } catch (e) {
+      print('Error fetching data: $e');
+    }
+  }
+
+  Future<void> sendMessage() async {
+    print(DateTime.now());
+    Map<String, dynamic> newmsg = {
+      'sender': useremail?.substring(0, useremail?.indexOf('@')),
+      'receiver': oppositeUser?['email']
+          .substring(0, oppositeUser?['email'].indexOf('@')),
+      'message': sendmsg.text.trim(),
+      'time': Timestamp.now()
+    };
+    conversations.add(newmsg);
+    var db = FirebaseFirestore.instance;
+    try {
+      db.collection('Conversations').add(newmsg).then((documentSnapshot) =>
+          print("Added Data with ID: ${documentSnapshot.id}"));
+    } catch (e) {
+      print(e);
+    }
+    setState(() {});
+  }
+
+  String formatTimestamp(Timestamp timestamp) {
+    DateTime dateTime =
+        DateTime.fromMillisecondsSinceEpoch(timestamp.seconds * 1000);
+    String formattedTime = '${dateTime.toLocal()}';
+    return formattedTime;
+  }
+
   @override
   Widget build(BuildContext context) {
-    String? name = oppositeUser?['name'] ?? '';
+    var name = oppositeUser?['name'] ?? '';
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -68,38 +122,61 @@ class TextPage extends State<Texting> {
         children: [
           Expanded(
             child: ListView.builder(
-                itemCount: universal.length,
+                itemCount: conversations.length,
                 itemBuilder: (context, index) {
-                  bool isPresent = userText.any((userMap) =>
-                      userMap["message"] == universal[index]["message"] &&
-                      userMap["time"] == universal[index]["time"]);
-                  if (isPresent) {
+                  bool user = oppositeUser?['email']
+                      .contains(conversations[index]['sender']);
+                  if (!user) {
                     return Align(
                       alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              universal[index]['message'] as String,
-                              style: TextStyle(fontSize: 20),
-                            ),Text("${universal[index]['time']}",style: TextStyle(fontSize: 10),)
-                          ],
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 10.0, bottom: 2),
+                        constraints:
+                            const BoxConstraints(minWidth: 70, maxWidth: 300),
+                        decoration: BoxDecoration(
+                            color: Colors.blue,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              Text(
+                                conversations[index]['message'] as String,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              Text(
+                                formatTimestamp(conversations[index]['time']),
+                                style: const TextStyle(fontSize: 10),
+                              )
+                            ],
+                          ),
                         ),
                       ),
                     );
                   } else {
                     return Align(
                       alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              universal[index]['message'] as String,
-                              style: TextStyle(fontSize: 20),
-                            ),Text("${universal[index]['time']}",style: TextStyle(fontSize: 10),)
-                          ],
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 10.0, bottom: 2),
+                        constraints:
+                            const BoxConstraints(minWidth: 70, maxWidth: 300),
+                        decoration: BoxDecoration(
+                            color: Colors.blue,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              Text(
+                                conversations[index]['message'] as String,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              Text(
+                                formatTimestamp(conversations[index]['time']),
+                                style: const TextStyle(fontSize: 10),
+                              )
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -107,6 +184,7 @@ class TextPage extends State<Texting> {
                 }),
           ),
           TextField(
+            controller: sendmsg,
             decoration: InputDecoration(
                 labelText: "Message",
                 suffixIcon: IconButton(
@@ -116,6 +194,7 @@ class TextPage extends State<Texting> {
                   ),
                   onPressed: () {
                     print('hi');
+                    sendMessage();
                   },
                 ),
                 enabledBorder: OutlineInputBorder(
