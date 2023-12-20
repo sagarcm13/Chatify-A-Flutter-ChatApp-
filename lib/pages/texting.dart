@@ -1,3 +1,4 @@
+import 'package:chatify/pages/login.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -27,10 +28,10 @@ class TextPage extends State<Texting> {
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (user == null) {
         useremail = '';
-        print('User is currently signed out!');
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => Login()));
       } else {
         useremail = user.email;
-        print(useremail);
         fetchData();
       }
     });
@@ -41,30 +42,20 @@ class TextPage extends State<Texting> {
     String opposite = oppositeUser?['email']
         .substring(0, oppositeUser?['email'].indexOf('@'));
     String? mainUser = useremail?.substring(0, useremail?.indexOf('@'));
-    print('$opposite $mainUser');
+    List<String> IDs = [mainUser!, opposite]..sort();
+    String chatId = IDs.join('_');
     try {
-      var querySnapshot = await db
+      var dat = await FirebaseFirestore.instance
           .collection('Conversations')
-          .where('sender', isEqualTo: mainUser)
-          .where('receiver', isEqualTo: opposite)
+          .doc(chatId)
+          .collection('Messages')
           .get();
-      for (var docSnapshot in querySnapshot.docs) {
+      for (var docSnapshot in dat.docs) {
         print('${docSnapshot.id} => ${docSnapshot.data()}');
         conversations.add(docSnapshot.data());
+        conversations.sort((a, b) => a['time'].compareTo(b['time']));
+        setState(() {});
       }
-      if (mainUser != opposite) {
-        querySnapshot = await db
-            .collection('Conversations')
-            .where('sender', isEqualTo: opposite)
-            .where('receiver', isEqualTo: mainUser)
-            .get();
-        for (var docSnapshot in querySnapshot.docs) {
-          print('${docSnapshot.id} => ${docSnapshot.data()}');
-          conversations.add(docSnapshot.data());
-        }
-      }
-      conversations.sort((a, b) => a['time'].compareTo(b['time']));
-      setState(() {});
     } catch (e) {
       print('Error fetching data: $e');
     }
@@ -72,10 +63,14 @@ class TextPage extends State<Texting> {
   }
 
   Future<void> sendMessage() async {
+    String opposite = oppositeUser?['email']
+        .substring(0, oppositeUser?['email'].indexOf('@'));
+    String? mainUser = useremail?.substring(0, useremail?.indexOf('@'));
+    List<String> IDs = [mainUser!, opposite]..sort();
+    String chatId = IDs.join('_');
     if (sendmsg.text.trim() == '') {
       return;
     }
-    print(Timestamp.now());
     Map<String, dynamic> newmsg = {
       'sender': useremail?.substring(0, useremail?.indexOf('@')),
       'receiver': oppositeUser?['email']
@@ -87,8 +82,12 @@ class TextPage extends State<Texting> {
     setState(() {});
     var db = FirebaseFirestore.instance;
     try {
-      await db.collection('Conversations').add(newmsg).then(
-          (documentSnapshot) =>
+      await db
+          .collection('Conversations')
+          .doc(chatId)
+          .collection('Messages')
+          .add(newmsg)
+          .then((documentSnapshot) =>
               print("Added Data with ID: ${documentSnapshot.id}"));
       sendmsg.clear();
     } catch (e) {
@@ -173,23 +172,25 @@ class TextPage extends State<Texting> {
                         Container(
                           foregroundDecoration: BoxDecoration(
                             border: Border.all(
-                              color: Colors.black, // Set the border color here
-                              width: 2.0,           // Set the border width here
+                              color: Colors.black,
+                              width: 2.0,
                             ),
-                          borderRadius: BorderRadius.circular(12.0),
+                            borderRadius: BorderRadius.circular(12.0),
                           ),
                           child: (index == 0)
                               ? Padding(
-                                padding: const EdgeInsets.all(5.0),
-                                child: Text(formatDate(conversations[index]['time']),),
-                              )
+                                  padding: const EdgeInsets.all(5.0),
+                                  child: Text(
+                                    formatDate(conversations[index]['time']),
+                                  ),
+                                )
                               : null,
                         ),
                         Container(
                           foregroundDecoration: BoxDecoration(
                             border: Border.all(
                               color: Colors.black, // Set the border color here
-                              width: 2.0,           // Set the border width here
+                              width: 2.0, // Set the border width here
                             ),
                             borderRadius: BorderRadius.circular(12.0),
                           ),
@@ -198,9 +199,10 @@ class TextPage extends State<Texting> {
                                       formatDate(
                                           conversations[index - 1]['time']))
                               ? Padding(
-                                padding: const EdgeInsets.all(5.0),
-                                child: Text(formatDate(conversations[index]['time'])),
-                              )
+                                  padding: const EdgeInsets.all(5.0),
+                                  child: Text(
+                                      formatDate(conversations[index]['time'])),
+                                )
                               : null,
                         ),
                         Align(
@@ -240,22 +242,23 @@ class TextPage extends State<Texting> {
                           foregroundDecoration: BoxDecoration(
                             border: Border.all(
                               color: Colors.black, // Set the border color here
-                              width: 2.0,           // Set the border width here
+                              width: 2.0, // Set the border width here
                             ),
                             borderRadius: BorderRadius.circular(12.0),
                           ),
                           child: (index == 0)
                               ? Padding(
-                                padding: const EdgeInsets.all(5.0),
-                                child: Text(formatDate(conversations[index]['time'])),
-                              )
+                                  padding: const EdgeInsets.all(5.0),
+                                  child: Text(
+                                      formatDate(conversations[index]['time'])),
+                                )
                               : null,
                         ),
                         Container(
                           foregroundDecoration: BoxDecoration(
                             border: Border.all(
                               color: Colors.black, // Set the border color here
-                              width: 2.0,           // Set the border width here
+                              width: 2.0, // Set the border width here
                             ),
                             borderRadius: BorderRadius.circular(12.0),
                           ),
@@ -264,9 +267,10 @@ class TextPage extends State<Texting> {
                                       formatDate(
                                           conversations[index - 1]['time']))
                               ? Padding(
-                                padding: const EdgeInsets.all(5.0),
-                                child: Text(formatDate(conversations[index]['time'])),
-                              )
+                                  padding: const EdgeInsets.all(5.0),
+                                  child: Text(
+                                      formatDate(conversations[index]['time'])),
+                                )
                               : null,
                         ),
                         Align(
