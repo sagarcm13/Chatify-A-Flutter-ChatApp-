@@ -24,12 +24,11 @@ class TextPage extends State<Texting> {
   }
 
   Future<void> fetchUser() async {
-    FirebaseAuth auth = FirebaseAuth.instance;
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (user == null) {
         useremail = '';
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (context) => Login()));
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => Login()));
       } else {
         useremail = user.email;
         fetchData();
@@ -37,25 +36,29 @@ class TextPage extends State<Texting> {
     });
   }
 
-  Future<void> fetchData() async {
-    var db = FirebaseFirestore.instance;
+  void fetchData()  {
     String opposite = oppositeUser?['email']
         .substring(0, oppositeUser?['email'].indexOf('@'));
     String? mainUser = useremail?.substring(0, useremail?.indexOf('@'));
     List<String> IDs = [mainUser!, opposite]..sort();
     String chatId = IDs.join('_');
     try {
-      var dat = await FirebaseFirestore.instance
+      var dat = FirebaseFirestore.instance
           .collection('Conversations')
           .doc(chatId)
           .collection('Messages')
-          .get();
-      for (var docSnapshot in dat.docs) {
-        print('${docSnapshot.id} => ${docSnapshot.data()}');
-        conversations.add(docSnapshot.data());
-        conversations.sort((a, b) => a['time'].compareTo(b['time']));
+          .orderBy('time')
+          .snapshots()
+          .listen((QuerySnapshot<Map<String, dynamic>> querySnapshot) {
+        conversations.clear();
+        for (var docSnapshot in querySnapshot.docs) {
+          conversations.add(docSnapshot.data());
+        }
         setState(() {});
-      }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          scrollToBottom();
+        });
+      });
     } catch (e) {
       print('Error fetching data: $e');
     }
@@ -241,8 +244,8 @@ class TextPage extends State<Texting> {
                         Container(
                           foregroundDecoration: BoxDecoration(
                             border: Border.all(
-                              color: Colors.black, // Set the border color here
-                              width: 2.0, // Set the border width here
+                              color: Colors.black,
+                              width: 2.0,
                             ),
                             borderRadius: BorderRadius.circular(12.0),
                           ),
